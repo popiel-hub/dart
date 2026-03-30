@@ -27,8 +27,7 @@
         .p-name { font-size: 0.75rem; text-transform: uppercase; color: #bdc3c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .p-score { font-size: 1.8rem; font-weight: bold; margin: 2px 0; line-height: 1.1; }
         
-        /* Styl statystyk w karcie */
-        .p-stats { display: flex; justify-content: space-around; font-size: 0.65rem; color: #95a5a6; border-top: 1px solid rgba(255,255,255,0.1); pt: 4px; margin-top: 4px; }
+        .p-stats { display: flex; justify-content: space-around; font-size: 0.65rem; color: #95a5a6; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; margin-top: 4px; }
         .stat-val { color: var(--accent); font-weight: bold; }
 
         .input-area { background: #222; padding: 15px; border-radius: 15px; border-top: 3px solid var(--accent); }
@@ -66,12 +65,6 @@
                 <option value="301">301</option>
                 <option value="501">501</option>
             </select>
-        </div>
-        <div class="setup-group">
-            <div class="checkbox-group">
-                <input type="checkbox" id="double-out">
-                <label for="double-out" style="margin:0; color: white;">Tryb Double Out</label>
-            </div>
         </div>
         <div class="setup-group">
             <label>Liczba graczy:</label>
@@ -119,7 +112,6 @@
     let players = [];
     let moveHistory = [];
     let currentPlayerIndex = 0;
-    let isDoubleOut = false;
     const defaultNames = ["Tomek", "Hela", "Basia", "Agata", "Ania"];
 
     function generateNameInputs() {
@@ -142,111 +134,102 @@
     function startGame() {
         const count = parseInt(document.getElementById('player-count').value);
         const startScore = parseInt(document.getElementById('start-score').value);
-        isDoubleOut = document.getElementById('double-out').checked;
         players = [];
         moveHistory = [];
         for (let i = 0; i < count; i++) {
             let name = document.getElementById(`name-${i}`).value || defaultNames[i];
             players.push({ 
-                name: name, 
+                name: name,
                 score: startScore,
-                totalPoints: 0,
-                turns: 0 
+                throws: 0,
+                totalPoints: 0
             });
         }
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('game-screen').style.display = 'block';
-        renderPlayers();
-        updateTurnInfo();
+        updateTurn();
     }
 
     function renderPlayers() {
         const list = document.getElementById('players-list');
-        list.innerHTML = players.map((p, i) => {
-            const avg = p.turns > 0 ? (p.totalPoints / p.turns).toFixed(1) : "0.0";
-            return `
+        list.innerHTML = '';
+        players.forEach((p, i) => {
+            const avg = p.throws > 0 ? (p.totalPoints / (p.throws/3)).toFixed(1) : 0;
+            list.innerHTML += `
                 <div class="player-card ${i === currentPlayerIndex ? 'active' : ''}">
                     <div class="p-name">${p.name}</div>
                     <div class="p-score">${p.score}</div>
                     <div class="p-stats">
-                        <span>Śr: <span class="stat-val">${avg}</span></span>
-                        <span>Lotki: <span class="stat-val">${p.turns * 3}</span></span>
+                        <span>AVG: <span class="stat-val">${avg}</span></span>
+                        <span>Rzuty: <span class="stat-val">${p.throws}</span></span>
                     </div>
-                </div>
-            `;
-        }).join('');
+                </div>`;
+        });
     }
 
-    function updateTurnInfo() {
+    function updateTurn() {
         document.getElementById('current-player-name').innerText = `${players[currentPlayerIndex].name} rzuca!`;
+        renderPlayers();
     }
 
     function processTurn() {
         const input = document.getElementById('pts-input');
-        const pts = input.value === '' ? 0 : parseInt(input.value);
+        const pts = parseInt(input.value) || 0;
         if (pts > 180) { alert("Max 180!"); clearInput(); return; }
 
-        let p = players[currentPlayerIndex];
-        let diff = p.score - pts;
-        let isFura = false;
-        let pointsToSubtract = pts;
+        const player = players[currentPlayerIndex];
+        const newScore = player.score - pts;
 
-        if (diff < 0 || diff === 1) { isFura = true; pointsToSubtract = 0; }
-        else if (diff === 0) {
-            if (isDoubleOut && pts % 2 !== 0) { isFura = true; pointsToSubtract = 0; alert("Double Out!"); }
-            else {
-                p.score = 0; renderPlayers();
-                alert(`WYGRANA: ${p.name}!`); location.reload(); return;
-            }
-        } else { p.score = diff; }
-
-        // Aktualizacja statystyk gracza
-        p.totalPoints += pts; // Do AVG liczymy faktycznie trafione punkty (nawet przy furze)
-        p.turns += 1;
+        if (newScore === 0) {
+            alert("GRACZ " + player.name + " WYGRYWA!");
+            location.reload();
+            return;
+        }
 
         moveHistory.push({
-            pIdx: currentPlayerIndex,
-            pName: p.name,
-            ptsEntered: pts,
-            actualMinus: pointsToSubtract,
-            fura: isFura
+            playerIndex: currentPlayerIndex,
+            points: pts,
+            oldScore: player.score,
+            oldThrows: player.throws,
+            oldTotal: player.totalPoints
         });
 
-        if (isFura && pts > 0) alert("FURA!");
-        
+        if (newScore > 1) {
+            player.score = newScore;
+            player.throws += 3;
+            player.totalPoints += pts;
+        } else {
+            alert("FURA!");
+        }
+
+        addHistoryItem(player.name, pts);
         currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
         clearInput();
-        renderPlayers();
-        updateTurnInfo();
-        updateHistoryUI();
+        updateTurn();
+    }
+
+    function addHistoryItem(name, pts) {
+        const list = document.getElementById('history-list');
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `<span>${name}</span><span>${pts} pkt</span>`;
+        list.prepend(item);
     }
 
     function undoLastMove() {
         if (moveHistory.length === 0) return;
         const last = moveHistory.pop();
+        const player = players[last.playerIndex];
         
-        currentPlayerIndex = last.pIdx;
-        let p = players[last.pIdx];
-        
-        // Cofnij punkty i statystyki
-        p.score += last.actualMinus;
-        p.totalPoints -= last.ptsEntered;
-        p.turns -= 1;
+        player.score = last.oldScore;
+        player.throws = last.oldThrows;
+        player.totalPoints = last.oldTotal;
+        currentPlayerIndex = last.playerIndex;
 
-        renderPlayers();
-        updateTurnInfo();
-        updateHistoryUI();
-        clearInput();
-    }
-
-    function updateHistoryUI() {
         const list = document.getElementById('history-list');
-        list.innerHTML = [...moveHistory].reverse().map(m => `
-            <div class="history-item">
-                <span>${m.pName}</span>
-                <span>${m.ptsEntered} pkt ${m.fura ? '❌' : '✅'}</span>
-            </div>
-        `).join('');
+        if (list.firstChild) list.removeChild(list.firstChild);
+        
+        updateTurn();
     }
 
     generateNameInputs();
