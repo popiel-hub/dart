@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LICZENIE PUNKTÓW DART</title>
+    <style>
+        :root { --accent: #e67e22; --bg: #1a1a1a; --card: #2c3e50; --btn-bg: #34495e; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding: 10px; touch-action: manipulation; }
+        .container { max-width: 500px; margin: 0 auto; }
+        
+        #setup-screen { background: #222; padding: 20px; border-radius: 15px; margin-top: 10px; border: 1px solid #444; }
+        .setup-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #bbb; font-size: 0.9rem; }
+        select, input { 
+            width: 100%; padding: 12px; background: #333; border: 1px solid #555; 
+            color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+        }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; background: #333; padding: 10px; border-radius: 8px; }
+        .checkbox-group input { width: auto; }
+
+        #game-screen { display: none; }
+        
+        .player-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+        .player-card { background: var(--card); padding: 8px; border-radius: 8px; text-align: center; border: 2px solid transparent; opacity: 0.5; transition: 0.3s; position: relative; }
+        .player-card.active { border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(230,126,34,0.3); background: #34495e; }
+        .p-name { font-size: 0.75rem; text-transform: uppercase; color: #bdc3c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .p-score { font-size: 1.8rem; font-weight: bold; margin: 2px 0; line-height: 1.1; }
+        
+        .p-stats { display: flex; justify-content: space-around; font-size: 0.65rem; color: #95a5a6; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; margin-top: 4px; }
+        .stat-val { color: var(--accent); font-weight: bold; }
+
+        .input-area { background: #222; padding: 15px; border-radius: 15px; border-top: 3px solid var(--accent); }
+        .turn-info { text-align: center; margin-bottom: 10px; color: var(--accent); font-weight: bold; font-size: 1.1rem; }
+        
+        .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .num-btn { 
+            background: var(--btn-bg); color: white; border: none; padding: 15px; 
+            border-radius: 8px; font-size: 1.5rem; font-weight: bold; cursor: pointer;
+        }
+        .num-btn:active { background: var(--accent); }
+        .num-btn.clear { background: #c0392b; }
+        
+        .btn-add { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.3rem; width: 100%; margin-top: 15px; cursor: pointer; }
+        .btn-reset { background: transparent; color: #777; border: 1px solid #444; width: 100%; margin-top: 15px; padding: 8px; border-radius: 5px; cursor: pointer; }
+        
+        #pts-input { text-align: center; font-size: 2rem; font-weight: bold; color: var(--accent); width: 100%; border: none; background: transparent; outline: none; }
+
+        .history-container { margin-top: 15px; background: #111; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .history-title { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .undo-btn { background: #444; color: #eee; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; }
+        #history-list { max-height: 80px; overflow-y: auto; }
+        .history-item { font-size: 0.85rem; padding: 3px 0; border-bottom: 1px solid #222; display: flex; justify-content: space-between; color: #aaa; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-screen">
+        <h2 style="text-align: center; color: var(--accent); margin-top: 0;">LICZENIE PUNKTÓW DART</h2>
+        <div class="setup-group">
+            <label>Punkty startowe:</label>
+            <select id="start-score">
+                <option value="301">301</option>
+                <option value="501">501</option>
+            </select>
+        </div>
+        <div class="setup-group">
+            <label>Liczba graczy:</label>
+            <input type="number" id="player-count" value="2" min="2" max="5" onchange="generateNameInputs()">
+        </div>
+        <div id="names-container"></div>
+        <button class="btn-add" onclick="startGame()">START</button>
+    </div>
+
+    <div id="game-screen">
+        <div id="players-list" class="player-grid"></div>
+        <div class="input-area">
+            <div id="current-player-name" class="turn-info">---</div>
+            <input type="number" id="pts-input" placeholder="0" readonly>
+            
+            <div class="numpad">
+                <button class="num-btn" onclick="addNum(1)">1</button>
+                <button class="num-btn" onclick="addNum(2)">2</button>
+                <button class="num-btn" onclick="addNum(3)">3</button>
+                <button class="num-btn" onclick="addNum(4)">4</button>
+                <button class="num-btn" onclick="addNum(5)">5</button>
+                <button class="num-btn" onclick="addNum(6)">6</button>
+                <button class="num-btn" onclick="addNum(7)">7</button>
+                <button class="num-btn" onclick="addNum(8)">8</button>
+                <button class="num-btn" onclick="addNum(9)">9</button>
+                <button class="num-btn clear" onclick="clearInput()">C</button>
+                <button class="num-btn" onclick="addNum(0)">0</button>
+                <button class="num-btn" style="background: #27ae60;" onclick="processTurn()">OK</button>
+            </div>
+
+            <div class="history-container">
+                <div class="history-header">
+                    <span class="history-title">Ostatnie rzuty</span>
+                    <button class="undo-btn" onclick="undoLastMove()">COFNIJ RUCH</button>
+                </div>
+                <div id="history-list"></div>
+            </div>
+
+            <button class="btn-reset" onclick="if(confirm('Zresetować?')) location.reload()">KONIEC GRY</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let players = [];
+    let moveHistory = [];
+    let currentPlayerIndex = 0;
+    const defaultNames = ["Tomek", "Hela", "Basia", "Agata", "Ania"];
+
+    function generateNameInputs() {
+        const count = document.getElementById('player-count').value;
+        const container = document.getElementById('names-container');
+        container.innerHTML = '<label>Imiona:</label>';
+        for (let i = 0; i < count; i++) {
+            let name = defaultNames[i] || `Gracz ${i+1}`;
+            container.innerHTML += `<input type="text" id="name-${i}" value="${name}" style="margin-bottom:8px;">`;
+        }
+    }
+
+    function addNum(n) {
+        const input = document.getElementById('pts-input');
+        if (input.value.length < 3) input.value += n;
+    }
+
+    function clearInput() { document.getElementById('pts-input').value = ''; }
+
+    function startGame() {
+        const count = parseInt(document.getElementById('player-count').value);
+        const startScore = parseInt(document.getElementById('start-score').value);
+        players = [];
+        moveHistory = [];
+        for (let i = 0; i < count; i++) {
+            let name = document.getElementById(`name-${i}`).value || defaultNames[i];
+            players.push({ 
+                name: name,
+                score: startScore,
+                throws: 0,
+                totalPoints: 0
+            });
+        }
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+        updateTurn();
+    }
+
+    function renderPlayers() {
+        const list = document.getElementById('players-list');
+        list.innerHTML = '';
+        players.forEach((p, i) => {
+            const avg = p.throws > 0 ? (p.totalPoints / (p.throws/3)).toFixed(1) : 0;
+            list.innerHTML += `
+                <div class="player-card ${i === currentPlayerIndex ? 'active' : ''}">
+                    <div class="p-name">${p.name}</div>
+                    <div class="p-score">${p.score}</div>
+                    <div class="p-stats">
+                        <span>Średnia: <span class="stat-val">${avg}</span></span>
+                     
+                    </div>
+                </div>`;
+        });
+    }
+
+    function updateTurn() {
+        document.getElementById('current-player-name').innerText = `${players[currentPlayerIndex].name} rzuca!`;
+        renderPlayers();
+    }
+
+    function processTurn() {
+        const input = document.getElementById('pts-input');
+        const pts = parseInt(input.value) || 0;
+        if (pts > 180) { alert("Max 180!"); clearInput(); return; }
+
+        const player = players[currentPlayerIndex];
+        const newScore = player.score - pts;
+
+        if (newScore === 0) {
+            alert("GRACZ " + player.name + " WYGRYWA!");
+            location.reload();
+            return;
+        }
+
+        moveHistory.push({
+            playerIndex: currentPlayerIndex,
+            points: pts,
+            oldScore: player.score,
+            oldThrows: player.throws,
+            oldTotal: player.totalPoints
+        });
+
+        if (newScore >= 1) {
+            player.score = newScore;
+            player.throws += 3;
+            player.totalPoints += pts;
+        } else {
+            alert("FURA!");
+        }
+
+        addHistoryItem(player.name, pts);
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+        clearInput();
+        updateTurn();
+    }
+
+    function addHistoryItem(name, pts) {
+        const list = document.getElementById('history-list');
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `<span>${name}</span><span>${pts} pkt</span>`;
+        list.prepend(item);
+    }
+
+    function undoLastMove() {
+        if (moveHistory.length === 0) return;
+        const last = moveHistory.pop();
+        const player = players[last.playerIndex];
+        
+        player.score = last.oldScore;
+        player.throws = last.oldThrows;
+        player.totalPoints = last.oldTotal;
+        currentPlayerIndex = last.playerIndex;
+
+        const list = document.getElementById('history-list');
+        if (list.firstChild) list.removeChild(list.firstChild);
+        
+        updateTurn();
+    }
+
+    generateNameInputs();
+</script>
+</body>
+</html>
