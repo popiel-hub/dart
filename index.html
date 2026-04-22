@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Liczenie punktów Dart</title>
+<style>
+:root { --accent: #1e90ff; --bg: #1a1a1a; --card: #2c3e50; --btn-bg: #34495e; }
+body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; 
+padding: 10px; touch-action: manipulation; }
+.container { max-width: 500px; margin: 0 auto; }
+#setup-screen { background: #222; padding: 20px; border-radius: 15px; margin-top: 
+10px; border: 1px solid #444; }
+.setup-group { margin-bottom: 15px; }
+label { display: block; margin-bottom: 5px; color: #bbb; font-size: 0.9rem; }
+select, input { 
+width: 100%; padding: 12px; background: #333; border: 1px solid #555; 
+color: white; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+}
+.checkbox-group { display: flex; align-items: center; gap: 10px; background: #333; 
+padding: 10px; border-radius: 8px; }
+.checkbox-group input { width: auto; }
+#game-screen { display: none; }
+.player-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 
+10px; }
+.player-card { background: var(--card); padding: 8px; border-radius: 8px; text-align: 
+center; border: 2px solid transparent; opacity: 0.5; transition: 0.3s; position: relative; }
+.player-card.active { border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px 
+rgba(230,126,34,0.3); background: #34495e; }
+.p-name { font-size: 0.75rem; text-transform: uppercase; color: #bdc3c7; white-space: 
+nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-score { font-size: 1.8rem; font-weight: bold; margin: 2px 0; line-height: 1.1; }
+.p-stats { display: flex; justify-content: space-around; font-size: 0.65rem; color: #95a5a6; 
+border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; margin-top: 4px; }
+.stat-val { color: var(--accent); font-weight: bold; }
+.input-area { background: #222; padding: 15px; border-radius: 15px; border-top: 3px 
+solid var(--accent); }
+.turn-info { text-align: center; margin-bottom: 10px; color: var(--accent); font-weight: 
+bold; font-size: 1.1rem; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 
+15px; }
+.num-btn { 
+background: var(--btn-bg); color: white; border: none; padding: 15px; 
+border-radius: 8px; font-size: 1.5rem; font-weight: bold; cursor: pointer;
+}
+.num-btn:active { background: var(--accent); }
+.num-btn.clear { background: #c0392b; }
+.btn-add { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.3rem; width: 100%; margin-top: 15px; cursor: 
+pointer; }
+.btn-reset { background: transparent; color: #777; border: 1px solid #444; width: 100%; 
+margin-top: 15px; padding: 8px; border-radius: 5px; cursor: pointer; }
+#pts-input { text-align: center; font-size: 2rem; font-weight: bold; color: var(--accent); 
+width: 100%; border: none; background: transparent; outline: none; }
+.history-container { margin-top: 15px; background: #111; padding: 10px; border-radius: 8px; 
+border: 1px solid #333; }
+.history-header { display: flex; justify-content: space-between; align-items: center; 
+margin-bottom: 8px; }
+.history-title { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 
+1px; }
+.undo-btn { background: #444; color: #eee; border: none; padding: 5px 10px; border-radius: 
+4px; font-size: 0.7rem; cursor: pointer; }
+#history-list { max-height: 80px; overflow-y: auto; }
+.history-item { font-size: 0.85rem; padding: 3px 0; border-bottom: 1px solid #222; 
+display: flex; justify-content: space-between; color: #aaa; }
+#match-history { background: #222; padding: 15px; border-radius: 15px; margin-top: 20px; 
+border: 1px solid #444; font-size: 0.8rem; }
+.history-entry { border-bottom: 1px solid #444; padding: 5px 0; display: flex; justify-content: 
+space-between; }
+</style>
+</head>
+<body>
+<div class="container">
+<div id="setup-screen">
+<h2 style="text-align: center; color: var(--accent); margin-top: 0;">LICZENIE PUNKTÓW 
+DART</h2>
+<div class="setup-group">
+<label>Punkty startowe:</label>
+<select id="start-score">
+<option value="101">101</option>
+<option value="201">201</option>
+<option value="301" selected>301</option>
+<option value="501">501</option>
+</select>
+</div>
+<div class="setup-group">
+<label>Graj do wygranych legów:</label>
+<select id="target-legs">
+<option value="1">1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+<option value="7">7</option>
+<option value="8">8</option>
+<option value="9">9</option>
+<option value="10">10</option>
+</select>
+</div>
+<div class="setup-group">
+<label>Liczba graczy:</label>
+<select id="player-count" onchange="generateNameInputs()">
+<option value="1">1</option>
+<option value="2" selected>2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+</select>
+</div>
+<div id="names-container"></div>
+<button class="btn-add" onclick="startGame()">START</button>
+<div id="match-history">
+<h3 style="margin-top:0; font-size:0.9rem; color:var(--accent)">HISTORIA MECZÓW</h3>
+<div id="match-history-list">Brak zapisanych gier.</div>
+</div>
+</div>
+<div id="game-screen">
+<div id="players-list" class="player-grid"></div>
+<div class="input-area">
+<div id="current-player-name" class="turn-info">---</div>
+<input type="number" id="pts-input" placeholder="0" readonly>
+<div class="numpad">
+<button class="num-btn" onclick="addNum(1)">1</button>
+<button class="num-btn" onclick="addNum(2)">2</button>
+<button class="num-btn" onclick="addNum(3)">3</button>
+<button class="num-btn" onclick="addNum(4)">4</button>
+<button class="num-btn" onclick="addNum(5)">5</button>
+<button class="num-btn" onclick="addNum(6)">6</button>
+<button class="num-btn" onclick="addNum(7)">7</button>
+<button class="num-btn" onclick="addNum(8)">8</button>
+<button class="num-btn" onclick="addNum(9)">9</button>
+<button class="num-btn clear" onclick="clearInput()">C</button>
+<button class="num-btn" onclick="addNum(0)">0</button>
+<button class="num-btn" style="background: #27ae60;" 
+onclick="processTurn()">OK</button>
+</div>
+<div class="history-container">
+<div class="history-header">
+<span class="history-title">Ostatnie rzuty</span>
+<div style="display: flex; gap: 5px;">
+ <button class="undo-btn" onclick="redoMove()" style="background: 
+#e67e22;">PONÓW</button>
+ <button class="undo-btn" onclick="undoLastMove()">COFNIJ</button>
+</div>
+</div>
+<div id="history-list"></div>
+</div>
+<!-- ZMIENIONE ONCLICK PONIŻEJ -->
+<button class="btn-reset" onclick="askReset()">KONIEC GRY</button>
+</div>
+</div>
+</div>
+<div id="custom-alert" style="display:none; position:fixed; top:50%; left:50%; 
+transform:translate(-50%, -50%); background:var(--card); border:2px solid var(--accent); 
+padding:30px; border-radius:15px; z-index:1000; text-align:center; box-shadow: 0 0 30px 
+rgba(0,0,0,0.5); min-width:250px;">
+<h2 id="alert-title" style="color:var(--accent); margin-top:0;"></h2>
+<p id="alert-msg" style="font-size:1.2rem;"></p>
+<!-- KONTENER NA PRZYCISKI -->
+<div id="alert-buttons">
+<button onclick="closeAlert()" class="btn-add" style="margin-top:10px;">OK</button>
+</div>
+</div>
+<div id="overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+background:rgba(0,0,0,0.7); z-index:999;"></div>
+<script>
+let players = [];
+let moveHistory = [];
+let redoStack = []; 
+let currentPlayerIndex = 0;
+let startingPlayerIndex = 0; 
+let targetLegs = 1;
+let initialScore = 301;
+const defaultNames = ["Hela", "Basia", "Agata", "Tomek", "Ania", "Piotrek"];
+function generateNameInputs() {
+const count = document.getElementById('player-count').value;
+const container = document.getElementById('names-container');
+container.innerHTML = '<label>Imiona:</label>';
+for (let i = 0; i < count; i++) {
+let name = defaultNames[i] || `Gracz ${i+1}`;
+container.innerHTML += `<input type="text" id="name-${i}" value="${name}" style="margin-bottom:8px;">`;
+}
+}
+function addNum(n) {
+const input = document.getElementById('pts-input');
+if (input.value.length < 3) input.value += n;
+}
+function clearInput() { document.getElementById('pts-input').value = ''; }
+function startGame() {
+const count = parseInt(document.getElementById('player-count').value);
+initialScore = parseInt(document.getElementById('start-score').value);
+targetLegs = parseInt(document.getElementById('target-legs').value);
+players = [];
+moveHistory = [];
+redoStack = []; 
+startingPlayerIndex = 0;
+for (let i = 0; i < count; i++) {
+let name = document.getElementById(`name-${i}`).value || defaultNames[i];
+players.push({ 
+name: name,
+score: initialScore,
+throws: 0,
+totalPoints: 0,
+legs: 0
+});
+}
+document.getElementById('setup-screen').style.display = 'none';
+document.getElementById('game-screen').style.display = 'block';
+updateTurn();
+}
+function renderPlayers() {
+const list = document.getElementById('players-list');
+list.innerHTML = '';
+players.forEach((p, i) => {
+const avg = p.throws > 0 ? ((p.totalPoints / p.throws) * 3).toFixed(1) : "0.0";
+list.innerHTML += `
+<div class="player-card ${i === currentPlayerIndex ? 'active' : ''}">
+<div class="p-name">${p.name} (Legi: ${p.legs} / ${targetLegs})</div>
+<div class="p-score">${p.score}</div>
+<div class="p-stats">
+<span>Średnia: <span class="stat-val">${avg}</span></span>
+<span>Rzuty: 
+<button onclick="adjustThrows(${i}, -1)" style="border:none; background:none; color:var(--accent); padding:0 2px; cursor:pointer; font-weight:bold;">-</button>
+<span class="stat-val">${p.throws}</span>
+<button onclick="adjustThrows(${i}, 1)" style="border:none; background:none; color:var(--accent); padding:0 2px; cursor:pointer; font-weight:bold;">+</button>
+</span>
+</div>
+</div>`;
+});
+}
+function adjustThrows(index, val) {
+if (players[index].throws + val >= 0) {
+players[index].throws += val;
+renderPlayers();
+}
+}
+function updateTurn() {
+const el = document.getElementById('current-player-name');
+el.innerText = ` ${players[currentPlayerIndex].name} rzuca `;
+el.style.fontSize = "30px";
+el.style.textAlign = "center";
+renderPlayers();
+}
+function processTurn(isRedo = false) {
+const input = document.getElementById('pts-input');
+const pts = parseInt(input.value) || 0;
+if (!isRedo) redoStack = [];
+const player = players[currentPlayerIndex];
+const cards = document.getElementsByClassName('player-card');
+const activeCard = cards[currentPlayerIndex];
+if (pts > 180) { 
+input.style.color = "#ff4757"; 
+setTimeout(() => { input.style.color = ""; clearInput(); updateTurn(); }, 800); 
+return; 
+}
+const newScore = player.score - pts;
+moveHistory.push({
+playerIndex: currentPlayerIndex,
+points: pts,
+oldScore: player.score,
+oldThrows: player.throws,
+oldTotal: player.totalPoints
+});
+if (newScore === 0) {
+player.score = 0;
+player.throws += 3;
+player.totalPoints += pts;
+player.legs++;
+if (player.legs >= targetLegs) {
+saveMatchToHistory(player.name);
+showNotification(" KONIEC MECZU!", "Wygrywa " + player.name, true);
+return;
+} else {
+showNotification(" LEG WYGRANY!", "Brawo " + player.name + "!");
+startingPlayerIndex = (startingPlayerIndex + 1) % players.length;
+resetScores(); clearInput(); updateTurn(); return;
+}
+} else if (newScore >= 1) {
+player.score = newScore;
+player.throws += 3;
+player.totalPoints += pts;
+addHistoryItem(player.name, pts);
+currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+clearInput(); updateTurn();
+} else {
+player.throws += 3;
+if (activeCard) {
+activeCard.style.borderColor = "#ff4757";
+activeCard.style.boxShadow = "0 0 20px #ff4757";
+activeCard.style.background = "#4c1a1a";
+}
+addHistoryItem(player.name, "FURA");
+clearInput();
+setTimeout(() => {
+currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+updateTurn();
+}, 1500);
+}
+}
+function resetScores() {
+players.forEach(p => { 
+p.score = initialScore; 
+p.throws = 0; 
+p.totalPoints = 0; 
+});
+moveHistory = [];
+redoStack = [];
+currentPlayerIndex = startingPlayerIndex;
+document.getElementById('history-list').innerHTML = '';
+}
+function saveMatchToHistory(winner) {
+let history = JSON.parse(localStorage.getItem('dartHistory') || '[]');
+const scoreString = players.map(p => `${p.name}: ${p.legs}`).join(' | ');
+history.unshift({ winner, scores: scoreString, date: new Date().toLocaleString() });
+localStorage.setItem('dartHistory', JSON.stringify(history.slice(0, 5)));
+}
+function displayMatchHistory() {
+const history = JSON.parse(localStorage.getItem('dartHistory') || '[]');
+const list = document.getElementById('match-history-list');
+if(history.length > 0) {
+list.innerHTML = history.map(h => `<div class="history-entry"><span><b>${h.winner}</b></span><span>${h.scores}</span></div>`).join('');
+}
+}
+function addHistoryItem(name, pts) {
+const list = document.getElementById('history-list');
+const item = document.createElement('div');
+item.className = 'history-item';
+const displayValue = (pts === "FURA") ? pts : pts + " pkt";
+item.innerHTML = `<span>${name}</span><span>${displayValue}</span>`;
+list.prepend(item);
+}
+
+// NOWA FUNKCJA PYTAJĄCA O RESET
+function askReset() {
+    document.getElementById('alert-title').innerText = "CZY NA PEWNO?";
+    document.getElementById('alert-msg').innerText = "Stracisz postęp bieżącego meczu.";
+    const btnContainer = document.getElementById('alert-buttons');
+    btnContainer.innerHTML = `
+        <div style="display: flex; gap: 10px;">
+            <button onclick="location.reload()" class="btn-add" style="margin-top:10px; background:#c0392b;">TAK</button>
+            <button onclick="closeAlert()" class="btn-add" style="margin-top:10px; background:#777;">NIE</button>
+        </div>
+    `;
+    document.getElementById('custom-alert').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+}
+
+function showNotification(title, message, isGameOver = false) {
+document.getElementById('alert-title').innerText = title;
+document.getElementById('alert-msg').innerText = message;
+const btnContainer = document.getElementById('alert-buttons');
+if(isGameOver) {
+    btnContainer.innerHTML = `<button onclick="location.reload()" class="btn-add" style="margin-top:10px;">ZAGRAJ PONOWNIE</button>`;
+} else {
+    btnContainer.innerHTML = `<button onclick="closeAlert()" class="btn-add" style="margin-top:10px;">OK</button>`;
+}
+document.getElementById('custom-alert').style.display = 'block';
+document.getElementById('overlay').style.display = 'block';
+}
+
+function closeAlert() {
+document.getElementById('custom-alert').style.display = 'none';
+document.getElementById('overlay').style.display = 'none';
+}
+function undoLastMove() {
+if (moveHistory.length === 0) return;
+const last = moveHistory.pop();
+redoStack.push(last);
+const player = players[last.playerIndex];
+player.score = last.oldScore;
+player.throws = last.oldThrows;
+player.totalPoints = last.oldTotal;
+currentPlayerIndex = last.playerIndex;
+const list = document.getElementById('history-list');
+if (list.firstChild) list.removeChild(list.firstChild);
+updateTurn();
+}
+function redoMove() {
+if (redoStack.length === 0) return;
+const lastCanceled = redoStack.pop();
+const input = document.getElementById('pts-input');
+input.value = lastCanceled.points;
+processTurn(true);
+}
+generateNameInputs();
+displayMatchHistory();
+</script>
+</body>
+</html>
